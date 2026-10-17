@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>LWH PTO</title>
+  <meta name="description" content="Logistics Warehouse employee PTO portal — request time off, check your balance and track requests.">
+  <meta name="theme-color" content="#C41230">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="assets/icons/emp-favicon.png">
+  <link rel="apple-touch-icon" href="assets/icons/emp-apple-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="LWH PTO">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="preload" href="assets/fonts/oswald-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/theme.css?v=1.0.0">
+</head>
+<body>
+  <div class="utility" id="utility"></div>
+  <header class="brandbar" id="brandbar"></header>
+
+  <nav class="nav" id="nav" hidden>
+    <div class="wrap">
+      <button data-view="home" class="active">Home</button>
+      <button data-view="request">Request Time Off</button>
+      <button data-view="requests">My Requests <span class="count" id="pendCount" hidden></span></button>
+      <button data-view="message">Message Manager</button>
+      <span class="spacer"></span>
+      <button class="logout" id="logoutBtn">Sign out</button>
+    </div>
+  </nav>
+
+  <div id="login" hidden></div>
+
+  <main class="wrap" id="app" hidden>
+    <!-- ================= HOME ================= -->
+    <section class="view active" id="v-home">
+      <div class="page-head">
+        <div><h1 id="welcome">Welcome back</h1><p id="welcomeSub">Here’s your time off at a glance.</p></div>
+      </div>
+      <div class="grid grid-main">
+        <div class="stack">
+          <div class="card">
+            <div class="card-head"><h2>PTO Balance</h2><span class="hint" id="balYear" style="margin:0"></span></div>
+            <div class="card-body" id="balanceBox"><div class="skel"></div><div class="skel" style="width:60%"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>Upcoming Time Off</h2><button class="btn btn-ghost btn-sm" data-go="requests">View all</button></div>
+            <div class="card-body flush" id="upcomingBox"><div class="card-body"><div class="skel"></div></div></div>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <div class="card-head"><h2>Current Conditions</h2></div>
+            <div class="card-body" id="wxBox"><div class="skel"></div><div class="skel" style="width:70%"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>Quick Actions</h2></div>
+            <div class="card-body">
+              <button class="btn btn-red btn-block" data-go="request" style="margin-bottom:10px">Request Time Off</button>
+              <button class="btn btn-black btn-block" data-go="message">Message My Manager</button>
+              <div class="hint" id="mgrLine" style="margin-top:12px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= REQUEST ================= -->
+    <section class="view" id="v-request">
+      <div class="page-head"><div><h1>Request Time Off</h1><p>Pick your dates — weekends and the 6 company holidays are never counted.</p></div></div>
+      <div class="grid grid-main">
+        <div class="card">
+          <div class="card-head"><h2>New Request</h2></div>
+          <div class="card-body">
+            <div class="field">
+              <label>Type</label>
+              <div class="seg" id="typeSeg">
+                <button type="button" data-type="Full Day PTO" class="on">Full Day PTO</button>
+                <button type="button" data-type="Half Day PTO">Half Day PTO</button>
+              </div>
+            </div>
+            <div class="row-2">
+              <div class="field"><label for="rqStart" id="rqStartLbl">First day off</label><input class="input" type="date" id="rqStart"></div>
+              <div class="field" id="rqEndWrap"><label for="rqEnd">Last day off</label><input class="input" type="date" id="rqEnd"></div>
+            </div>
+            <div class="field">
+              <label for="rqNotes">Notes <span style="text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+              <div class="chips" id="rqChips">
+                <button type="button" class="chip">🌴 Vacation</button>
+                <button type="button" class="chip">🏥 Doctor Appointment</button>
+                <button type="button" class="chip">🤒 Feeling Unwell</button>
+                <button type="button" class="chip">👶 Child Care</button>
+                <button type="button" class="chip">⛈️ Weather Related</button>
+                <button type="button" class="chip">🏠 Personal/Family</button>
+              </div>
+              <textarea class="input" id="rqNotes" maxlength="1000" placeholder="Tap a note above or type your own…"></textarea>
+            </div>
+            <button class="btn btn-red btn-block" id="rqSubmit">Submit Request</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Summary</h2></div>
+          <div class="card-body" id="rqSummary"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= MY REQUESTS ================= -->
+    <section class="view" id="v-requests">
+      <div class="page-head"><div><h1>My Requests</h1><p>Everything you’ve submitted. You can withdraw anything that’s pending or approved.</p></div>
+        <button class="btn btn-ghost btn-sm" id="refreshBtn">↻ Refresh</button></div>
+      <div class="card">
+        <div class="card-head"><div class="chips" id="reqFilter" style="margin:0">
+          <button class="chip on" data-f="upcoming">Upcoming</button>
+          <button class="chip" data-f="pending">Pending</button>
+          <button class="chip" data-f="approved">Approved</button>
+          <button class="chip" data-f="past">Past</button>
+          <button class="chip" data-f="closed">Denied / Withdrawn</button>
+          <button class="chip" data-f="all">All</button>
+        </div></div>
+        <div class="card-body flush" id="reqList"></div>
+      </div>
+    </section>
+
+    <!-- ================= MESSAGE ================= -->
+    <section class="view" id="v-message">
+      <div class="page-head"><div><h1>Message Manager</h1><p>Your manager gets this by email and can reply straight to you.</p></div></div>
+      <div class="card" style="max-width:720px">
+        <div class="card-head"><h2>New Message</h2><span class="hint" id="msgTo" style="margin:0"></span></div>
+        <div class="card-body">
+          <div class="field">
+            <label>Subject</label>
+            <div class="chips" id="msgChips">
+              <button type="button" class="chip" data-s="PTO Question">❓ PTO Question</button>
+              <button type="button" class="chip" data-s="Schedule Change">📅 Schedule Change</button>
+              <button type="button" class="chip" data-s="Running Late">⏰ Running Late</button>
+              <button type="button" class="chip" data-s="Sick Today">🤒 Sick Today</button>
+              <button type="button" class="chip" data-s="General Question">💭 General Question</button>
+            </div>
+            <input class="input" id="msgSubject" maxlength="120" placeholder="Or type your own subject">
+          </div>
+          <div class="field"><label for="msgBody">Message</label><textarea class="input" id="msgBody" maxlength="3000" style="min-height:150px" placeholder="Type your message…"></textarea></div>
+          <button class="btn btn-black" id="msgSend">Send Message</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer" id="footer">Logistics Warehouse, Inc. · PTO &amp; Absence Portal</footer>
+
+  <script src="assets/js/config.js?v=1.0.0"></script>
+  <script src="assets/js/common.js?v=1.0.0"></script>
+  <script src="assets/js/login.js?v=1.0.0"></script>
+  <script src="assets/js/employee.js?v=1.0.0"></script>
+</body>
+</html>

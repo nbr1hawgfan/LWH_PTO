@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>LWH PTO Manager</title>
+  <meta name="description" content="Logistics Warehouse PTO & absence manager portal — approvals, team calendar, absences, balances and HR reports.">
+  <meta name="theme-color" content="#1C1C1C">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="../assets/icons/mgr-favicon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/mgr-apple-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="PTO Manager">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="preload" href="../assets/fonts/oswald-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../assets/css/theme.css?v=1.0.0">
+</head>
+<body>
+  <div class="utility" id="utility"></div>
+  <header class="brandbar" id="brandbar"></header>
+
+  <nav class="nav" id="nav" hidden>
+    <div class="wrap">
+      <button data-view="home" class="active">Home</button>
+      <button data-view="approvals">Approvals <span class="count" id="pendCount" hidden></span></button>
+      <button data-view="calendar">Team Calendar</button>
+      <button data-view="record">Record Absence</button>
+      <button data-view="balances">PTO Balances</button>
+      <button data-view="analytics">Absence Analytics</button>
+      <button data-view="hr">HR Report</button>
+      <span class="spacer"></span>
+      <button class="logout" id="logoutBtn">Sign out</button>
+    </div>
+  </nav>
+
+  <div id="login" hidden></div>
+
+  <main class="wrap" id="app" hidden>
+    <!-- ================= HOME ================= -->
+    <section class="view active" id="v-home">
+      <div class="page-head">
+        <div><h1 id="welcome">Welcome back</h1><p id="welcomeSub">Here’s what’s happening with time off today.</p></div>
+        <button class="btn btn-ghost btn-sm" data-refresh>↻ Refresh</button>
+      </div>
+      <div class="tiles">
+        <button class="tile" data-go="approvals"><div class="k">Pending Approvals</div><div class="v" id="tPend">–</div><div class="h">Waiting on a decision</div></button>
+        <button class="tile dark" data-go="calendar"><div class="k">Out Today</div><div class="v" id="tToday">–</div><div class="h" id="tTodayH">Approved absences</div></button>
+        <button class="tile green" data-go="calendar"><div class="k">Out This Week</div><div class="v" id="tWeek">–</div><div class="h" id="tWeekH">Mon – Fri</div></button>
+        <button class="tile amber" data-go="balances"><div class="k">Low Balances</div><div class="v" id="tLow">–</div><div class="h" id="tLowH">At or under 2 days</div></button>
+      </div>
+      <div class="grid grid-main">
+        <div class="stack">
+          <div class="card"><div class="card-head"><h2>Who’s Out Today</h2><span class="hint" id="todayLbl" style="margin:0"></span></div><div class="card-body flush" id="outToday"></div></div>
+          <div class="card"><div class="card-head"><h2>Coming Up · Next 14 Days</h2></div><div class="card-body flush" id="outSoon"></div></div>
+        </div>
+        <div class="stack">
+          <div class="card"><div class="card-head"><h2>Current Conditions</h2></div><div class="card-body" id="wxBox"><div class="skel"></div></div></div>
+          <div class="card"><div class="card-head"><h2>Needs Attention</h2><button class="btn btn-ghost btn-sm" data-go="approvals">Open</button></div><div class="card-body flush" id="pendPreview"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= APPROVALS ================= -->
+    <section class="view" id="v-approvals">
+      <div class="page-head"><div><h1>Pending Approvals</h1><p>Approving deducts PTO, emails the employee, their manager and HR, and attaches the PDF record.</p></div>
+        <button class="btn btn-ghost btn-sm" data-refresh>↻ Refresh</button></div>
+      <div class="card">
+        <div class="card-head"><div class="chips" id="apScope" style="margin:0">
+          <button class="chip on" data-s="all">Everyone</button>
+          <button class="chip" data-s="mine">My Team</button>
+        </div><span class="hint" id="apCount" style="margin:0"></span></div>
+        <div class="card-body flush" id="apList"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Recently Decided</h2></div>
+        <div class="card-body flush" id="apRecent"></div>
+      </div>
+    </section>
+
+    <!-- ================= CALENDAR ================= -->
+    <section class="view" id="v-calendar">
+      <div class="page-head"><div><h1>Team Calendar</h1><p>Tap a day to see who’s out. Tap a name for details.</p></div></div>
+      <div class="card">
+        <div class="card-head">
+          <div class="cal-ctrl">
+            <button class="btn btn-black btn-sm" id="calPrev">‹</button>
+            <div class="month" id="calMonth"></div>
+            <button class="btn btn-black btn-sm" id="calNext">›</button>
+            <button class="btn btn-ghost btn-sm" id="calToday">Today</button>
+          </div>
+          <div class="cal-ctrl">
+            <select class="input" id="calDept" style="width:auto;min-width:170px;padding-top:8px;padding-bottom:8px"><option value="">All departments</option></select>
+            <label class="check" style="margin:0"><input type="checkbox" id="calPending" checked> Show pending</label>
+          </div>
+        </div>
+        <div class="card-body" style="padding:12px"><div class="cal" id="calGrid"></div></div>
+        <div class="legend">
+          <span><i style="border-color:var(--red);background:var(--red-tint)"></i>Full Day PTO</span>
+          <span><i style="border-color:#7B3FA0;background:#F3EAF8"></i>Half Day / Personal</span>
+          <span><i style="border-color:#E39400;background:var(--amber-tint)"></i>Sick / Call-in / NCNS</span>
+          <span><i style="border-color:var(--green);background:var(--green-tint)"></i>Excused / Bereavement</span>
+          <span><i style="border-color:#78909C;background:#EEF1F3"></i>Other / Late</span>
+          <span><i style="border-color:#999;background:repeating-linear-gradient(135deg,#fff 0 3px,#ddd 3px 6px)"></i>Pending</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="dayTitle">Selected Day</h2></div>
+        <div class="card-body flush" id="dayList"></div>
+      </div>
+    </section>
+
+    <!-- ================= RECORD ================= -->
+    <section class="view" id="v-record">
+      <div class="page-head"><div><h1>Record Absence</h1><p>PTO types go to Pending for approval. All other types are recorded as approved right away.</p></div></div>
+      <div class="grid grid-main">
+        <div class="card">
+          <div class="card-head"><h2>New Entry</h2></div>
+          <div class="card-body">
+            <div class="field"><label for="reSearch">Employee</label>
+              <input class="input" id="reSearch" placeholder="Type to search…" autocomplete="off" style="margin-bottom:8px">
+              <select class="input" id="reEmp"><option value="">— Select employee —</option></select></div>
+            <div class="field"><label for="reType">Absence type</label><select class="input" id="reType"><option value="">— Select type —</option></select></div>
+            <div class="row-2">
+              <div class="field"><label for="reStart" id="reStartLbl">Start date</label><input class="input" type="date" id="reStart"></div>
+              <div class="field" id="reEndWrap"><label for="reEnd">End date</label><input class="input" type="date" id="reEnd"></div>
+            </div>
+            <div class="row-2" id="reTimeWrap" hidden>
+              <div class="field"><label for="reT1">Start time</label><input class="input" type="time" id="reT1"></div>
+              <div class="field"><label for="reT2">End time</label><input class="input" type="time" id="reT2"></div>
+            </div>
+            <div class="field"><label for="reReason">Reason / notes</label>
+              <div class="chips" id="reChips">
+                <button type="button" class="chip">🏖️ Vacation / PTO</button><button type="button" class="chip">🤒 Sick / Illness</button>
+                <button type="button" class="chip">👨‍⚕️ Doctor Appointment</button><button type="button" class="chip">👶 Child Care</button>
+                <button type="button" class="chip">🌧️ Weather / Road Conditions</button><button type="button" class="chip">🏠 Personal / Family</button>
+                <button type="button" class="chip">🚗 Transportation Issue</button><button type="button" class="chip">⚰️ Bereavement / Funeral</button>
+                <button type="button" class="chip">⚖️ Jury Duty / Legal</button><button type="button" class="chip">🤕 Work Injury</button>
+                <button type="button" class="chip">📵 No Call No Show</button><button type="button" class="chip">⏰ Tardy / Late Arrival</button>
+                <button type="button" class="chip">🏃 Left Early</button><button type="button" class="chip">🏥 Emergency</button>
+                <button type="button" class="chip">🔁 FMLA / Leave of Absence</button><button type="button" class="chip">🏫 School / Training</button>
+                <button type="button" class="chip">🔃 Schedule Conflict</button><button type="button" class="chip">📋 Manager Note:</button>
+              </div>
+              <textarea class="input" id="reReason" maxlength="1000" placeholder="Tap a quick note or type a reason…"></textarea></div>
+            <div class="btn-row"><button class="btn btn-red" id="reSubmit">Record Absence</button><button class="btn btn-ghost" id="reClear">Clear</button></div>
+          </div>
+        </div>
+        <div class="card"><div class="card-head"><h2>Preview</h2></div><div class="card-body" id="rePreview"></div></div>
+      </div>
+    </section>
+
+    <!-- ================= BALANCES ================= -->
+    <section class="view" id="v-balances">
+      <div class="page-head"><div><h1>PTO Balances</h1><p id="balSub">Allocated, used and remaining days for every employee.</p></div>
+        <div class="btn-row"><button class="btn btn-ghost btn-sm" id="balCsv">⬇ CSV</button><button class="btn btn-black btn-sm" id="balEmail">✉ Email PTO Report</button></div></div>
+      <div class="card">
+        <div class="filters">
+          <div class="field"><label>Department</label><select class="input" id="balDept"><option value="">All departments</option></select></div>
+          <div class="field"><label>Manager</label><select class="input" id="balMgr"><option value="">All managers</option></select></div>
+          <div class="field"><label>Search</label><input class="input" id="balSearch" placeholder="Employee name…"></div>
+        </div>
+        <div class="table-wrap" id="balTable"></div>
+      </div>
+    </section>
+
+    <!-- ================= ANALYTICS ================= -->
+    <section class="view" id="v-analytics">
+      <div class="page-head"><div><h1>Absence Analytics</h1><p>Approved absences by type, per employee.</p></div>
+        <div class="btn-row"><button class="btn btn-ghost btn-sm" id="anCsv">⬇ CSV</button><button class="btn btn-black btn-sm" id="anEmail">✉ Email Absence Report</button></div></div>
+      <div class="card">
+        <div class="filters">
+          <div class="field"><label>Department</label><select class="input" id="anDept"><option value="">All departments</option></select></div>
+          <div class="field"><label>Employee</label><select class="input" id="anEmp"><option value="">All employees</option></select></div>
+          <div class="field"><label>Year</label><select class="input" id="anYear"></select></div>
+        </div>
+        <div class="card-body" style="padding-bottom:0"><div class="tiles" id="anTiles" style="margin-bottom:18px"></div></div>
+        <div class="table-wrap" id="anTable"></div>
+      </div>
+    </section>
+
+    <!-- ================= HR REPORT ================= -->
+    <section class="view" id="v-hr">
+      <div class="page-head"><div><h1>HR Detailed Report</h1><p>Every request on file — all statuses.</p></div>
+        <div class="btn-row"><button class="btn btn-ghost btn-sm" id="hrCsv">⬇ CSV</button><button class="btn btn-black btn-sm" id="hrEmail">✉ Email Report (HTML + CSV)</button></div></div>
+      <div class="card">
+        <div class="filters">
+          <div class="field"><label>Employee</label><select class="input" id="hrEmp"><option value="">All employees</option></select></div>
+          <div class="field"><label>Year</label><select class="input" id="hrYear"></select></div>
+          <div class="field"><label>Status</label><select class="input" id="hrStatus"><option value="">All statuses</option><option>Approved</option><option>Pending</option><option>Denied</option><option>Cancelled</option></select></div>
+          <div class="field"><label>Type</label><select class="input" id="hrType"><option value="">All types</option></select></div>
+        </div>
+        <div class="card-body" style="padding-bottom:0"><div class="tiles" id="hrTiles" style="margin-bottom:18px"></div></div>
+        <div class="table-wrap" id="hrTable"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">Logistics Warehouse, Inc. · PTO &amp; Absence Manager Portal</footer>
+
+  <script src="../assets/js/config.js?v=1.0.0"></script>
+  <script src="../assets/js/common.js?v=1.0.0"></script>
+  <script src="../assets/js/login.js?v=1.0.0"></script>
+  <script src="../assets/js/manager.js?v=1.0.0"></script>
+</body>
+</html>
