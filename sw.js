@@ -1,17 +1,17 @@
 /* LWH PTO — Employee service worker
    Bump VERSION whenever you upload changed files so phones pick them up. */
-const VERSION = 'lwhpto-emp-v1.0.0';
+const VERSION = 'lwhpto-emp-v1.1.0';
 const SHELL = [
   './',
   'index.html',
   'manifest.webmanifest',
-  'assets/js/employee.js?v=1.0.0',
+  'assets/js/employee.js?v=1.1.0',
   'assets/icons/emp-192.png',
   'assets/img/logo.png',
-  'assets/css/theme.css?v=1.0.0',
-  'assets/js/config.js?v=1.0.0',
-  'assets/js/common.js?v=1.0.0',
-  'assets/js/login.js?v=1.0.0',
+  'assets/css/theme.css?v=1.1.0',
+  'assets/js/config.js?v=1.1.0',
+  'assets/js/common.js?v=1.1.0',
+  'assets/js/login.js?v=1.1.0',
   'assets/fonts/oswald-latin-500-normal.woff2',
   'assets/fonts/oswald-latin-700-normal.woff2',
   'assets/fonts/inter-latin-400-normal.woff2',

@@ -4,10 +4,10 @@
 (function () {
   'use strict';
   const P = window.PTO, $ = P.$, $$ = P.$$, esc = P.esc;
-  const VIEWS = ['home', 'approvals', 'calendar', 'record', 'balances', 'analytics', 'hr'];
+  const VIEWS = ['home', 'approvals', 'asks', 'calendar', 'record', 'balances', 'analytics', 'hr'];
   const LOW = P.CFG.LOW_BALANCE_DAYS || 2;
   const S = {
-    profile: null, employees: [], empById: {}, types: [], team: [], teamById: {}, requests: [], hrEmails: [],
+    profile: null, employees: [], empById: {}, types: [], team: [], teamById: {}, requests: [], asks: [], hrEmails: [], askScope: 'all',
     loadedAt: 0, scope: 'all', calMonth: new Date(P.today().getFullYear(), P.today().getMonth(), 1), calSel: P.today(),
     balSort: { key: 'name', dir: 'asc' }, hrSort: { key: '_s', dir: 'desc' }, anRows: []
   };
@@ -57,6 +57,7 @@
         const e = S.empById[r.employeeId] || {};
         return Object.assign(r, { _s: P.parseAnyDate(r.startDate), _e: P.parseAnyDate(r.endDate) || P.parseAnyDate(r.startDate), _dept: e.department || '', _mgr: e.manager || '' });
       });
+      S.asks = d.asks || [];
       S.loadedAt = Date.now();
       fillFilters();
       renderAll();
@@ -71,7 +72,9 @@
   document.addEventListener('click', e => { if (e.target.closest('[data-refresh]')) { P.toast('Refreshing…'); load(); } });
 
   function renderAll() {
-    renderHome(); renderApprovals(); renderCalendar(); renderBalances(); renderAnalytics(true); renderHR(); renderRecordPreview();
+    renderHome(); renderApprovals(); renderAsks(); renderCalendar();
+    const aw = S.asks.filter(a => a.status === 'Waiting').length;
+    const ac = $('#askCount'); ac.textContent = aw; ac.hidden = !aw; renderBalances(); renderAnalytics(true); renderHR(); renderRecordPreview();
     const pend = S.requests.filter(r => r.status === 'Pending').length;
     const pc = $('#pendCount'); pc.textContent = pend; pc.hidden = !pend;
   }
@@ -123,6 +126,8 @@
     const low = S.team.filter(e => P.num(e.remaining) <= LOW);
     const pend = S.requests.filter(r => r.status === 'Pending').sort((a, b) => (a._s || 0) - (b._s || 0));
     $('#tPend').textContent = pend.length;
+    const asksWaiting = S.asks.filter(a => a.status === 'Waiting').length;
+    $('#tPend').parentElement.querySelector('.h').textContent = asksWaiting ? '+ ' + asksWaiting + ' time off ask' + (asksWaiting === 1 ? '' : 's') : 'Waiting on a decision';
     $('#tToday').textContent = outToday.length;
     $('#tTodayH').textContent = outToday.length ? outToday.slice(0, 3).map(r => P.firstName(r.employeeName)).join(', ') + (outToday.length > 3 ? '…' : '') : 'Everyone’s in';
     $('#tWeek').textContent = outWeekIds.size;
@@ -206,6 +211,85 @@
       try { await P.api('mgr.deny', { requestId: id, reason }); P.busy(false); P.toast('Denied — ' + r.employeeName + ' has been notified.'); load(); }
       catch (err) { P.busy(false); P.toast(err.message, true); load(true); }
     }
+  });
+
+
+  // ------------------------------------------------------------------ asks
+  $$('#akScope .chip').forEach(c => c.onclick = () => { S.askScope = c.dataset.s; $$('#akScope .chip').forEach(x => x.classList.toggle('on', x === c)); renderAsks(); });
+  function askMine(a) {
+    const me = S.profile || {};
+    return (me.email && String(a.managerEmail).toLowerCase() === String(me.email).toLowerCase()) || (me.name && String(a.manager).toLowerCase() === String(me.name).toLowerCase());
+  }
+  function renderAsks() {
+    let wait = S.asks.filter(a => a.status === 'Waiting');
+    if (S.askScope === 'mine') wait = wait.filter(askMine);
+    wait.sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)));
+    $('#akCountLbl').textContent = wait.length + ' waiting';
+    $('#akList').innerHTML = wait.length ? wait.map(a => {
+      const bal = balanceOf(a.employeeId);
+      const ov = S.requests.filter(r => r.employeeId === a.employeeId && active(r) && r._s && P.ymd(r._s) <= a.endDate && P.ymd(r._e) >= a.startDate);
+      return '<div class="req"><div class="stripe" style="background:var(--blue)"></div><div>' +
+        '<div class="t">' + esc(a.employeeName) + ' <span style="font-weight:500;color:var(--muted);font-size:13.5px">' + esc(a.department) + '</span></div>' +
+        '<div class="d"><b>' + esc(P.fmtRange(a.startDate, a.endDate)) + '</b> · ' + esc(a.timingLabel) + '</div>' +
+        '<div class="n">' + P.escNote(a.reason) + '</div>' +
+        '<div class="m">Asked ' + esc(P.fmt(a.submitted, 'dow')) + (a.manager ? ' · Manager: ' + esc(a.manager) : '') + (bal != null ? ' · PTO balance ' + P.days1(bal) : '') + '</div>' +
+        (ov.length ? '<div class="note warn" style="margin-top:8px;font-size:13px">Already on file those dates: ' + ov.map(r => esc(r.absenceType + ' (' + r.status + ')')).join(', ') + '</div>' : '') +
+        '</div><div class="act"><div class="btn-row"><button class="btn btn-green btn-sm" data-askrec="' + esc(a.askId) + '">Record…</button>' +
+        '<button class="btn btn-red btn-sm" data-askdec="' + esc(a.askId) + '">Decline</button></div></div></div>';
+    }).join('') : emptyBox('🙌', S.askScope === 'mine' ? 'No asks waiting for your team.' : 'No time off asks waiting.');
+    const done = S.asks.filter(a => a.status !== 'Waiting').slice(0, 10);
+    const badgeFor = { Recorded: 'b-approved', Declined: 'b-denied', Withdrawn: 'b-cancelled' };
+    $('#akDone').innerHTML = done.length ? '<div class="plist">' + done.map(a =>
+      '<div><div class="avatar">' + esc(P.initials(a.employeeName)) + '</div><div style="min-width:0"><div class="who-n">' + esc(a.employeeName) + '</div>' +
+      '<div class="who-m">' + esc(P.fmtRange(a.startDate, a.endDate).replace(/, \d{4}$/, '')) + ' · ' + esc(a.timingLabel) + '</div></div>' +
+      '<div class="right"><span class="badge ' + (badgeFor[a.status] || '') + '">' + esc(a.status) + '</span><div class="who-m">' +
+      (a.status === 'Recorded' ? esc(a.recordedAs) + ' · ' : '') + esc(a.handledBy || '') + '</div></div></div>').join('') + '</div>'
+      : emptyBox('🗂️', 'Nothing handled recently.');
+  }
+
+  document.addEventListener('click', async e => {
+    const rec = e.target.closest('[data-askrec]'), dec = e.target.closest('[data-askdec]');
+    if (!rec && !dec) return;
+    const a = S.asks.find(x => x.askId === (rec || dec).dataset.askrec || x.askId === (rec || dec).dataset.askdec); if (!a) return;
+    const head = '<dl class="kv"><dt>Employee</dt><dd><b>' + esc(a.employeeName) + '</b></dd><dt>Asked for</dt><dd>' + esc(P.fmtRange(a.startDate, a.endDate)) + ' · ' + esc(a.timingLabel) + '</dd>' +
+      '<dt>Reason</dt><dd>' + P.escNote(a.reason) + '</dd></dl>';
+    if (dec) {
+      const note = await P.modal({
+        title: 'Decline Ask', html: head + '<div class="field" style="margin-top:16px"><label for="adNote">Note to the employee</label><textarea class="input" id="adNote" maxlength="500" placeholder="e.g. Need you for the 3:00 load — can we do Thursday?"></textarea></div>',
+        buttons: [{ label: 'Cancel', cls: 'btn-ghost', value: null }, { label: 'Decline', cls: 'btn-red', validate: m => $('#adNote', m).value.trim() ? '' : 'Add a short note.', value: m => $('#adNote', m).value.trim() }]
+      });
+      if (!note) return;
+      P.busy('Declining…');
+      try { await P.api('mgr.askDecline', { askId: a.askId, note }); P.busy(false); P.toast('Declined — ' + a.employeeName + ' has been emailed.'); load(); }
+      catch (err) { P.busy(false); P.toast(err.message, true); load(true); }
+      return;
+    }
+    // Record — non-PTO types only; Personal Time first if it exists
+    const types = S.types.filter(t => !t.isPTO).map(t => t.name);
+    const prefer = types.indexOf('Personal Time') !== -1 ? 'Personal Time' : types[0];
+    const t1 = a.timing === 'leave' ? a.startTime : a.timing === 'arrive' ? (P.CFG.WORKDAY_START || '08:00') : a.timing === 'custom' ? a.startTime : '';
+    const t2 = a.timing === 'leave' ? (P.CFG.WORKDAY_END || '17:00') : a.timing === 'arrive' ? a.startTime : a.timing === 'custom' ? a.endTime : '';
+    const v = await P.modal({
+      title: 'Record Ask', wide: false,
+      html: head + '<div class="note good" style="margin:14px 0">Recording puts this on the official attendance record (approved) and emails ' + esc(P.firstName(a.employeeName)) + '. It does not use PTO.</div>' +
+        '<div class="field"><label for="arType">Record as</label><select class="input" id="arType">' + types.map(t => '<option' + (t === prefer ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select></div>' +
+        '<div class="row-2"><div class="field"><label for="arS">Start date</label><input class="input" type="date" id="arS" value="' + esc(a.startDate) + '"></div>' +
+        '<div class="field"><label for="arE">End date</label><input class="input" type="date" id="arE" value="' + esc(a.endDate) + '"></div></div>' +
+        '<div class="row-2"><div class="field"><label for="arT1">Start time</label><input class="input" type="time" id="arT1" value="' + esc(t1) + '"></div>' +
+        '<div class="field"><label for="arT2">End time</label><input class="input" type="time" id="arT2" value="' + esc(t2) + '"></div></div>' +
+        '<p class="hint" style="margin-top:-6px">Times count toward hours for Personal Time (hours ÷ 8). Leave them blank for full days.</p>',
+      buttons: [{ label: 'Cancel', cls: 'btn-ghost', value: null }, {
+        label: 'Record', cls: 'btn-green',
+        validate: m => { const s = $('#arS', m).value, e2 = $('#arE', m).value || s; if (!s) return 'Pick a start date.'; if (e2 < s) return 'End date can’t be before start.'; const x = $('#arT1', m).value, y = $('#arT2', m).value; if ((x && !y) || (!x && y)) return 'Fill in both times or neither.'; if (x && y && y <= x) return 'End time must be after start time.'; return ''; },
+        value: m => ({ absenceType: $('#arType', m).value, startDate: $('#arS', m).value, endDate: $('#arE', m).value || $('#arS', m).value, startTime: $('#arT1', m).value, endTime: $('#arT2', m).value })
+      }]
+    });
+    if (!v) return;
+    P.busy('Recording…');
+    try {
+      const res = await P.api('mgr.askRecord', Object.assign({ askId: a.askId, reason: 'Time off ask: ' + a.reason }, v), { timeout: 90000 });
+      P.busy(false); P.toast('Recorded as ' + v.absenceType + ' (' + P.days1(res.daysCount) + ' day) — ' + a.employeeName + ' has been emailed.'); load();
+    } catch (err) { P.busy(false); P.toast(err.message, true); load(true); }
   });
 
   // --------------------------------------------------------- detail modal

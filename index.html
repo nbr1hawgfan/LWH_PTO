@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="LWH PTO">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="preload" href="assets/fonts/oswald-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/css/theme.css?v=1.0.0">
+  <link rel="stylesheet" href="assets/css/theme.css?v=1.1.0">
 </head>
 <body>
   <div class="utility" id="utility"></div>
@@ -22,7 +22,8 @@
   <nav class="nav" id="nav" hidden>
     <div class="wrap">
       <button data-view="home" class="active">Home</button>
-      <button data-view="request">Request Time Off</button>
+      <button data-view="request">Request PTO</button>
+      <button data-view="ask">Ask for Time Off <span class="count" id="askCount" hidden></span></button>
       <button data-view="requests">My Requests <span class="count" id="pendCount" hidden></span></button>
       <button data-view="message">Message Manager</button>
       <span class="spacer"></span>
@@ -57,7 +58,8 @@
           <div class="card">
             <div class="card-head"><h2>Quick Actions</h2></div>
             <div class="card-body">
-              <button class="btn btn-red btn-block" data-go="request" style="margin-bottom:10px">Request Time Off</button>
+              <button class="btn btn-red btn-block" data-go="request" style="margin-bottom:10px">Request PTO</button>
+              <button class="btn btn-ghost btn-block" data-go="ask" style="margin-bottom:10px">Ask for Unpaid Time Off</button>
               <button class="btn btn-black btn-block" data-go="message">Message My Manager</button>
               <div class="hint" id="mgrLine" style="margin-top:12px"></div>
             </div>
@@ -68,7 +70,7 @@
 
     <!-- ================= REQUEST ================= -->
     <section class="view" id="v-request">
-      <div class="page-head"><div><h1>Request Time Off</h1><p>Pick your dates — weekends and the 6 company holidays are never counted.</p></div></div>
+      <div class="page-head"><div><h1>Request PTO</h1><p>Pick your dates — weekends and the 6 company holidays are never counted.</p></div></div>
       <div class="grid grid-main">
         <div class="card">
           <div class="card-head"><h2>New Request</h2></div>
@@ -102,6 +104,52 @@
         <div class="card">
           <div class="card-head"><h2>Summary</h2></div>
           <div class="card-body" id="rqSummary"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ASK ================= -->
+    <section class="view" id="v-ask">
+      <div class="page-head"><div><h1>Ask for Time Off</h1><p>Out of PTO, need to leave early or come in late? Ask your manager first.</p></div></div>
+      <div class="note warn" style="margin-bottom:20px;font-size:15px">
+        <b>An ask is not approval.</b> Sending an ask does <b>not</b> give you the time off and does not use PTO.
+        Your manager decides. If they say yes, they record it and you get an email. Until then, plan to be at work as scheduled.
+      </div>
+      <div class="grid grid-main">
+        <div class="card">
+          <div class="card-head"><h2>New Ask</h2><span class="hint" id="askTo" style="margin:0"></span></div>
+          <div class="card-body">
+            <div class="row-2">
+              <div class="field"><label for="akStart">Date</label><input class="input" type="date" id="akStart"></div>
+              <div class="field"><label for="akEnd">Through <span style="text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label><input class="input" type="date" id="akEnd"></div>
+            </div>
+            <div class="field">
+              <label>What do you need?</label>
+              <div class="seg" id="akTiming">
+                <button type="button" data-t="allday" class="on">All day</button>
+                <button type="button" data-t="leave">Leave early</button>
+                <button type="button" data-t="arrive">Come in late</button>
+                <button type="button" data-t="custom">Other time</button>
+              </div>
+            </div>
+            <div class="row-2" id="akTimes" hidden>
+              <div class="field"><label for="akT1" id="akT1Lbl">Time</label><input class="input" type="time" id="akT1"></div>
+              <div class="field" id="akT2Wrap" hidden><label for="akT2">Until</label><input class="input" type="time" id="akT2"></div>
+            </div>
+            <div class="field"><label for="akReason">Why do you need it?</label>
+              <div class="chips" id="akChips">
+                <button type="button" class="chip">🏥 Appointment</button><button type="button" class="chip">👶 Child care / school</button>
+                <button type="button" class="chip">🏠 Family matter</button><button type="button" class="chip">🚗 Car trouble</button>
+                <button type="button" class="chip">⚖️ Court / legal</button><button type="button" class="chip">🎓 School event</button>
+              </div>
+              <textarea class="input" id="akReason" maxlength="500" placeholder="A short reason for your manager…"></textarea></div>
+            <button class="btn btn-black btn-block" id="akSend">Send Ask to My Manager</button>
+            <p class="hint" style="margin-top:10px">Your manager gets an email right away. You’ll get one too when they decide.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>My Asks</h2></div>
+          <div class="card-body flush" id="askList"></div>
         </div>
       </div>
     </section>
@@ -149,9 +197,9 @@
 
   <footer class="footer" id="footer">Logistics Warehouse, Inc. · PTO &amp; Absence Portal</footer>
 
-  <script src="assets/js/config.js?v=1.0.0"></script>
-  <script src="assets/js/common.js?v=1.0.0"></script>
-  <script src="assets/js/login.js?v=1.0.0"></script>
-  <script src="assets/js/employee.js?v=1.0.0"></script>
+  <script src="assets/js/config.js?v=1.1.0"></script>
+  <script src="assets/js/common.js?v=1.1.0"></script>
+  <script src="assets/js/login.js?v=1.1.0"></script>
+  <script src="assets/js/employee.js?v=1.1.0"></script>
 </body>
 </html>

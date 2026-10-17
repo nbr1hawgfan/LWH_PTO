@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="PTO Manager">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="preload" href="../assets/fonts/oswald-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="../assets/css/theme.css?v=1.0.0">
+  <link rel="stylesheet" href="../assets/css/theme.css?v=1.1.0">
 </head>
 <body>
   <div class="utility" id="utility"></div>
@@ -23,6 +23,7 @@
     <div class="wrap">
       <button data-view="home" class="active">Home</button>
       <button data-view="approvals">Approvals <span class="count" id="pendCount" hidden></span></button>
+      <button data-view="asks">Asks <span class="count" id="askCount" hidden></span></button>
       <button data-view="calendar">Team Calendar</button>
       <button data-view="record">Record Absence</button>
       <button data-view="balances">PTO Balances</button>
@@ -74,6 +75,23 @@
       <div class="card">
         <div class="card-head"><h2>Recently Decided</h2></div>
         <div class="card-body flush" id="apRecent"></div>
+      </div>
+    </section>
+
+    <!-- ================= ASKS ================= -->
+    <section class="view" id="v-asks">
+      <div class="page-head"><div><h1>Time Off Asks</h1><p>Employees asking for unpaid time, to leave early or come in late. Nothing is on the record until you <b>Record</b> it.</p></div>
+        <button class="btn btn-ghost btn-sm" data-refresh>↻ Refresh</button></div>
+      <div class="card">
+        <div class="card-head"><div class="chips" id="akScope" style="margin:0">
+          <button class="chip on" data-s="all">Everyone</button>
+          <button class="chip" data-s="mine">My Team</button>
+        </div><span class="hint" id="akCountLbl" style="margin:0"></span></div>
+        <div class="card-body flush" id="akList"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Recently Handled</h2></div>
+        <div class="card-body flush" id="akDone"></div>
       </div>
     </section>
 
@@ -196,9 +214,9 @@
 
   <footer class="footer">Logistics Warehouse, Inc. · PTO &amp; Absence Manager Portal</footer>
 
-  <script src="../assets/js/config.js?v=1.0.0"></script>
-  <script src="../assets/js/common.js?v=1.0.0"></script>
-  <script src="../assets/js/login.js?v=1.0.0"></script>
-  <script src="../assets/js/manager.js?v=1.0.0"></script>
+  <script src="../assets/js/config.js?v=1.1.0"></script>
+  <script src="../assets/js/common.js?v=1.1.0"></script>
+  <script src="../assets/js/login.js?v=1.1.0"></script>
+  <script src="../assets/js/manager.js?v=1.1.0"></script>
 </body>
 </html>

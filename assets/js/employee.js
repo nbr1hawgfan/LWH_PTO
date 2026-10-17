@@ -4,8 +4,8 @@
 (function () {
   'use strict';
   const P = window.PTO, $ = P.$, $$ = P.$$, esc = P.esc;
-  const VIEWS = ['home', 'request', 'requests', 'message'];
-  const state = { profile: null, balance: null, requests: [], loadedAt: 0, type: 'Full Day PTO', filter: 'upcoming' };
+  const VIEWS = ['home', 'request', 'ask', 'requests', 'message'];
+  const state = { profile: null, balance: null, requests: [], asks: [], loadedAt: 0, type: 'Full Day PTO', filter: 'upcoming', timing: 'allday' };
 
   // ---------------------------------------------------------------- boot
   P.renderChrome({ root: '', sub: 'Employee PTO Portal' });
@@ -48,6 +48,7 @@
       state.profile = Object.assign({}, state.profile, d.profile);
       state.balance = d.balance || { allocated: 0, used: 0, remaining: 0 };
       state.requests = (d.requests || []).map(r => Object.assign(r, { _s: P.parseAnyDate(r.startDate), _e: P.parseAnyDate(r.endDate) || P.parseAnyDate(r.startDate) }));
+      state.asks = d.asks || [];
       state.loadedAt = Date.now();
       renderAll();
     } catch (e) {
@@ -60,12 +61,15 @@
   });
 
   function renderAll() {
-    renderBalance(); renderUpcoming(); renderList(); renderSummary();
+    renderBalance(); renderUpcoming(); renderList(); renderSummary(); renderAsks();
+    const wait = state.asks.filter(a => a.status === 'Waiting').length;
+    const ac = $('#askCount'); ac.textContent = wait; ac.hidden = !wait;
     const pend = state.requests.filter(r => r.status === 'Pending').length;
     const pc = $('#pendCount'); pc.textContent = pend; pc.hidden = !pend;
     const p = state.profile || {};
     $('#mgrLine').textContent = p.manager ? 'Your manager: ' + p.manager : '';
     $('#msgTo').textContent = p.manager ? 'To: ' + p.manager : '';
+    $('#askTo').textContent = p.manager ? 'Goes to: ' + p.manager : '';
   }
 
   // --------------------------------------------------------------- routing
@@ -285,6 +289,76 @@
     } catch (e) { P.busy(false); P.toast(e.message, true); }
     finally { btn.disabled = false; }
   };
+
+
+  // ------------------------------------------------------------------- asks
+  const todayStr = P.ymd(P.today());
+  $('#akStart').min = todayStr; $('#akEnd').min = todayStr;
+  $('#akStart').addEventListener('change', () => { const s = $('#akStart').value, e = $('#akEnd'); e.min = s || todayStr; if (e.value && e.value < s) e.value = ''; });
+  $$('#akTiming button').forEach(b => b.onclick = () => {
+    state.timing = b.dataset.t;
+    $$('#akTiming button').forEach(x => x.classList.toggle('on', x === b));
+    const t = state.timing;
+    $('#akTimes').hidden = t === 'allday';
+    $('#akT2Wrap').hidden = t !== 'custom';
+    $('#akT1Lbl').textContent = t === 'leave' ? 'Leave at' : t === 'arrive' ? 'Arrive at' : 'From';
+  });
+  $$('#akChips .chip').forEach(c => c.onclick = () => { const ta = $('#akReason'), v = c.textContent.trim(); ta.value = ta.value.trim() ? ta.value.trim() + ' — ' + v : v; ta.focus(); });
+
+  const ASK_STATUS = {
+    Waiting: ['b-pending', 'Waiting', 'Waiting on your manager — <b>not approved yet</b>.'],
+    Recorded: ['b-approved', 'Approved & recorded', ''],
+    Declined: ['b-denied', 'Declined', ''],
+    Withdrawn: ['b-cancelled', 'Withdrawn', '']
+  };
+  function renderAsks() {
+    const box = $('#askList'); if (!box) return;
+    if (!state.asks.length) { box.innerHTML = '<div class="empty"><div class="e">🙋</div>No asks yet.</div>'; return; }
+    box.innerHTML = state.asks.map(a => {
+      const st = ASK_STATUS[a.status] || ASK_STATUS.Waiting;
+      let extra = st[2];
+      if (a.status === 'Recorded') extra = 'Recorded as <b>' + esc(a.recordedAs) + '</b> by ' + esc(a.handledBy) + '. You’re approved for this time.';
+      if (a.status === 'Declined') extra = '<b>' + esc(a.handledBy) + ':</b> ' + P.escNote(a.managerNote);
+      const cls = a.status === 'Recorded' ? 'approved' : a.status === 'Declined' ? 'denied' : a.status === 'Withdrawn' ? 'cancelled' : '';
+      return '<div class="req ' + cls + '"><div class="stripe"></div><div>' +
+        '<div class="t">' + esc(P.fmtRange(a.startDate, a.endDate)) + ' <span class="badge ' + st[0] + '">' + st[1] + '</span></div>' +
+        '<div class="d">' + esc(a.timingLabel) + '</div>' +
+        '<div class="n">' + P.escNote(a.reason) + '</div>' +
+        (extra ? '<div class="m" style="margin-top:6px;font-size:13.5px;color:var(--ink-2)">' + extra + '</div>' : '') +
+        '</div><div class="act">' + (a.status === 'Waiting' ? '<button class="btn btn-ghost btn-sm" data-askwd="' + esc(a.askId) + '">Withdraw</button>' : '') + '</div></div>';
+    }).join('');
+  }
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-askwd]'); if (!b) return;
+    if (!(await P.confirmBox('Withdraw Ask?', '<p>Your manager will be told you no longer need this time.</p>', 'Withdraw', 'btn-red'))) return;
+    P.busy('Withdrawing…');
+    try { await P.api('emp.askWithdraw', { askId: b.dataset.askwd }); P.busy(false); P.toast('Ask withdrawn.'); load(); }
+    catch (err) { P.busy(false); P.toast(err.message, true); }
+  });
+  $('#akSend').onclick = async () => {
+    const s = $('#akStart').value, e = $('#akEnd').value || s, t = state.timing, t1 = $('#akT1').value, t2 = $('#akT2').value, reason = $('#akReason').value.trim();
+    if (!s) return P.toast('Pick a date.', true);
+    if (e < s) return P.toast('“Through” can’t be before the first date.', true);
+    if ((t === 'leave' || t === 'arrive') && !t1) return P.toast('Pick a time.', true);
+    if (t === 'custom' && (!t1 || !t2 || t2 <= t1)) return P.toast('Pick a start and end time.', true);
+    if (!reason) return P.toast('Add a short reason for your manager.', true);
+    const label = t === 'allday' ? 'All day' : t === 'leave' ? 'Leave early at ' + to12(t1) : t === 'arrive' ? 'Come in late at ' + to12(t1) : to12(t1) + ' – ' + to12(t2);
+    const ok = await P.confirmBox('Send this ask?',
+      '<dl class="kv"><dt>To</dt><dd>' + esc((state.profile && state.profile.manager) || 'Your manager') + '</dd><dt>When</dt><dd>' + esc(P.fmtRange(s, e)) + '</dd>' +
+      '<dt>What</dt><dd>' + esc(label) + '</dd><dt>Reason</dt><dd>' + esc(reason) + '</dd></dl>' +
+      '<div class="note warn" style="margin-top:14px"><b>This is not approval.</b> You don’t have this time off unless your manager says yes.</div>', 'Send Ask', 'btn-black');
+    if (!ok) return;
+    const btn = $('#akSend'); btn.disabled = true; P.busy('Sending…');
+    try {
+      await P.api('emp.ask', { startDate: s, endDate: e, timing: t, startTime: t1, endTime: t2, reason });
+      P.busy(false);
+      ['akStart', 'akEnd', 'akT1', 'akT2', 'akReason'].forEach(id => $('#' + id).value = '');
+      P.toast('Ask sent to your manager — not approved yet. Watch your email.');
+      load();
+    } catch (err) { P.busy(false); P.toast(err.message, true); }
+    finally { btn.disabled = false; }
+  };
+  function to12(t) { const m = String(t || '').match(/^(\d{1,2}):(\d{2})/); if (!m) return t; let h = +m[1]; const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return h + ':' + m[2] + ' ' + ap; }
 
   // ---------------------------------------------------------------- message
   $$('#msgChips .chip').forEach(c => c.onclick = () => {

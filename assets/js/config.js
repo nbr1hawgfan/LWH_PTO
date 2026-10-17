@@ -23,6 +23,11 @@ window.PTO_CONFIG = {
   // Employee app: how far back people may submit (matches the old portal).
   PAST_DAYS_ALLOWED: 180,
 
+  // Manager "Record" defaults for asks: a "leave early" ask fills end time
+  // with WORKDAY_END, a "come in late" ask fills start time with WORKDAY_START.
+  WORKDAY_START: '08:00',
+  WORKDAY_END: '17:00',
+
   // Highlight balances at or below this many days in red.
   LOW_BALANCE_DAYS: 2
 };
