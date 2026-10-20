@@ -1,6 +1,6 @@
 /* LWH PTO — Employee service worker
    Bump VERSION whenever you upload changed files so phones pick them up. */
-const VERSION = 'lwhpto-emp-v1.1.0';
+const VERSION = 'lwhpto-emp-v1.1.1';
 const SHELL = [
   './',
   'index.html',
